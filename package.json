@@ -1,0 +1,17 @@
+{
+  "name": "standup",
+  "version": "0.1.0",
+  "description": "Small standup-note recording app",
+  "main": "index.js",
+  "scripts": {
+    "build": "elm make src/Main.elm --yes --output app.js",
+    "watch": "chokidar \"src/**/*.elm\" -c \"npm run build\"",
+    "debug": "elm reactor -p 3000"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "chokidar-cli": "^1.2.0",
+    "elm": "^0.18.0"
+  }
+}
