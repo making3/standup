@@ -1,16 +1,19 @@
 module Main exposing (..)
 
+import Dom exposing (focus)
 import Html exposing (Attribute, Html, button, div, h6, input, span, text)
-import Html.Attributes exposing (class, value)
+import Html.Attributes exposing (class, disabled, hidden, id, value)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Json.Decode
+import Task
 
 
 main =
-    Html.beginnerProgram
-        { model = model
+    Html.program
+        { init = init
         , view = view
         , update = update
+        , subscriptions = subscriptions
         }
 
 
@@ -22,15 +25,27 @@ type alias Model =
     { todo : List String
     , completed : List String
     , currentStandupTask : String
+    , error : Maybe String
     }
 
 
-model : Model
-model =
+initialModel : Model
+initialModel =
     { todo = []
     , completed = []
     , currentStandupTask = ""
+    , error = Nothing
     }
+
+
+init : ( Model, Cmd Msg )
+init =
+    initialModel ! [ Task.attempt FocusResult (focus taskInputId) ]
+
+
+taskInputId : String
+taskInputId =
+    "taskInput"
 
 
 
@@ -40,10 +55,21 @@ model =
 view : Model -> Html Msg
 view model =
     div []
-        [ viewCompletedTasks model
+        [ viewError model
+        , viewCompletedTasks model
         , viewTodoTasks model
-        , input [ onEnter Add, onInput ChangeStandupTask, value model.currentStandupTask ] []
+        , input [ id taskInputId, onEnter Add, onInput ChangeStandupTask, value model.currentStandupTask ] []
         ]
+
+
+viewError : Model -> Html Msg
+viewError model =
+    case model.error of
+        Just error ->
+            div [] [ text error ]
+
+        Nothing ->
+            text ""
 
 
 viewTodoTasks : Model -> Html Msg
@@ -99,22 +125,31 @@ type Msg
     | Add
     | Complete String
     | Delete String
+    | FocusResult (Result Dom.Error ())
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Add ->
-            addNewTask model.currentStandupTask model
+            addNewTask model.currentStandupTask model ! []
 
         Complete task ->
-            completeTask task model
+            completeTask task model ! []
 
         Delete task ->
-            { model | completed = removeTask task model.completed }
+            { model | completed = removeTask task model.completed } ! []
 
         ChangeStandupTask newInput ->
-            { model | currentStandupTask = newInput }
+            { model | currentStandupTask = newInput } ! []
+
+        FocusResult result ->
+            case result of
+                Err (Dom.NotFound id) ->
+                    { model | error = Just ("Could not find dom id: " ++ id) } ! []
+
+                Ok () ->
+                    { model | error = Nothing } ! []
 
 
 addNewTask : String -> Model -> Model
@@ -133,3 +168,12 @@ completeTask completedTask model =
 removeTask : String -> List String -> List String
 removeTask taskToRemove tasks =
     List.filter (\task -> task /= taskToRemove) tasks
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.none
