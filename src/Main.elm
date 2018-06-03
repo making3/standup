@@ -2,7 +2,7 @@ module Main exposing (..)
 
 import Dom exposing (focus)
 import Html exposing (Attribute, Html, a, button, div, h3, i, input, li, span, text, ul)
-import Html.Attributes exposing (class, disabled, hidden, id, value)
+import Html.Attributes exposing (class, disabled, hidden, id, placeholder, value)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Json.Decode
 import Task
@@ -53,7 +53,15 @@ view model =
         [ viewError model
         , viewCompletedTasks model
         , viewTodoTasks model
-        , input [ id taskInputId, onEnter Add, onInput ChangeStandupTask, value model.currentStandupTask ] []
+        , input
+            [ id taskInputId
+            , class "input"
+            , onEnter Add
+            , onInput ChangeStandupTask
+            , value model.currentStandupTask
+            , placeholder "What are you planning on doing?"
+            ]
+            []
         ]
 
 
