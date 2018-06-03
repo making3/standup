@@ -1,8 +1,9 @@
 module Main exposing (..)
 
-import Html exposing (Html, button, div, h6, input, span, text)
+import Html exposing (Attribute, Html, button, div, h6, input, span, text)
 import Html.Attributes exposing (class, value)
-import Html.Events exposing (onClick, onInput)
+import Html.Events exposing (keyCode, on, onClick, onInput)
+import Json.Decode
 
 
 main =
@@ -41,8 +42,7 @@ view model =
     div []
         [ viewCompletedTasks model
         , viewTodoTasks model
-        , input [ onInput ChangeStandupTask, value model.currentStandupTask ] []
-        , button [ onClick Add ] [ text "Add" ]
+        , input [ onEnter Add, onInput ChangeStandupTask, value model.currentStandupTask ] []
         ]
 
 
@@ -76,6 +76,18 @@ viewCompletedTask task =
         [ text task
         , button [ onClick (Delete task) ] [ text "Remove" ]
         ]
+
+
+onEnter : Msg -> Attribute Msg
+onEnter msg =
+    let
+        isEnter code =
+            if code == 13 then
+                Json.Decode.succeed msg
+            else
+                Json.Decode.fail "not ENTER"
+    in
+    on "keydown" (Json.Decode.andThen isEnter keyCode)
 
 
 
