@@ -61,7 +61,10 @@ viewError : Model -> Html Msg
 viewError model =
     case model.error of
         Just error ->
-            div [] [ text error ]
+            div [ class "notification is-danger" ]
+                [ button [ onClick ClearError, class "delete" ] []
+                , text error
+                ]
 
         Nothing ->
             text ""
@@ -146,6 +149,7 @@ type Msg
     | Complete String
     | Delete String
     | FocusResult (Result Dom.Error ())
+    | ClearError
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -170,6 +174,9 @@ update msg model =
 
                 Ok () ->
                     { model | error = Nothing } ! []
+
+        ClearError ->
+            { model | error = Nothing } ! []
 
 
 focusOnTaskInput : Cmd Msg
