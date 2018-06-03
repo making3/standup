@@ -40,12 +40,7 @@ initialModel =
 
 init : ( Model, Cmd Msg )
 init =
-    initialModel ! [ Task.attempt FocusResult (focus taskInputId) ]
-
-
-taskInputId : String
-taskInputId =
-    "taskInput"
+    initialModel ! [ focusOnTaskInput ]
 
 
 
@@ -135,10 +130,10 @@ update msg model =
             addNewTask model.currentStandupTask model ! []
 
         Complete task ->
-            completeTask task model ! []
+            completeTask task model ! [ focusOnTaskInput ]
 
         Delete task ->
-            { model | completed = removeTask task model.completed } ! []
+            { model | completed = removeTask task model.completed } ! [ focusOnTaskInput ]
 
         ChangeStandupTask newInput ->
             { model | currentStandupTask = newInput } ! []
@@ -150,6 +145,16 @@ update msg model =
 
                 Ok () ->
                     { model | error = Nothing } ! []
+
+
+focusOnTaskInput : Cmd Msg
+focusOnTaskInput =
+    Task.attempt FocusResult (focus taskInputId)
+
+
+taskInputId : String
+taskInputId =
+    "taskInput"
 
 
 addNewTask : String -> Model -> Model
