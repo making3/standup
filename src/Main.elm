@@ -186,10 +186,15 @@ addNewTask : String -> Model -> Model
 addNewTask newTask model =
     case model.currentStandupTask of
         "" ->
-            model ! []
+            model
 
         _ ->
-            { model | todo = model.currentStandupTask :: model.todo, currentStandupTask = "" }
+            case List.any (\task -> task == model.currentStandupTask) model.todo of
+                True ->
+                    { model | error = Just "Task has already been added!" }
+
+                False ->
+                    { model | todo = model.currentStandupTask :: model.todo, currentStandupTask = "" }
 
 
 completeTask : String -> Model -> Model
