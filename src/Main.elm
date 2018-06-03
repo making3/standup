@@ -1,7 +1,7 @@
 module Main exposing (..)
 
 import Dom exposing (focus)
-import Html exposing (Attribute, Html, button, div, h6, input, span, text)
+import Html exposing (Attribute, Html, button, div, h4, input, li, span, text, ul)
 import Html.Attributes exposing (class, disabled, hidden, id, value)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Json.Decode
@@ -69,15 +69,24 @@ viewError model =
 
 viewTodoTasks : Model -> Html Msg
 viewTodoTasks model =
+    let
+        todoTasks =
+            case model.todo of
+                [] ->
+                    [ li [] [ text "No pending tasks" ] ]
+
+                _ ->
+                    List.map viewTodoTask model.todo
+    in
     div []
-        [ h6 [] [ text "TODO" ]
-        , div [] (List.map viewTodoTask model.todo)
+        [ h4 [] [ text "TODO" ]
+        , ul [] todoTasks
         ]
 
 
 viewTodoTask : String -> Html Msg
 viewTodoTask task =
-    div []
+    li []
         [ text task
         , button [ onClick (Complete task) ] [ text "Complete" ]
         ]
@@ -85,9 +94,18 @@ viewTodoTask task =
 
 viewCompletedTasks : Model -> Html Msg
 viewCompletedTasks model =
+    let
+        completedTasks =
+            case model.completed of
+                [] ->
+                    [ li [] [ text "No completed tasks" ] ]
+
+                _ ->
+                    List.map viewCompletedTask model.completed
+    in
     div []
-        [ h6 [] [ text "Completed" ]
-        , div [] (List.map viewCompletedTask model.completed)
+        [ h4 [] [ text "Completed" ]
+        , ul [] completedTasks
         ]
 
 
