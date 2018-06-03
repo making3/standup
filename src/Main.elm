@@ -24,6 +24,7 @@ main =
 type alias Model =
     { todo : List String
     , completed : List String
+    , eventualTasks : List String
     , currentStandupTask : String
     , error : Maybe String
     }
@@ -33,6 +34,7 @@ initialModel : Model
 initialModel =
     { todo = []
     , completed = []
+    , eventualTasks = []
     , currentStandupTask = ""
     , error = Nothing
     }
@@ -53,6 +55,7 @@ view model =
         [ viewError model
         , viewCompletedTasks model
         , viewTodoTasks model
+        , viewEventualTasks model
         , input
             [ id taskInputId
             , class "input"
@@ -90,7 +93,7 @@ viewTodoTasks model =
                     List.map viewTodoTask model.todo
     in
     div [ class "content" ]
-        [ h3 [ class "title is-4" ] [ text "TODO" ]
+        [ h3 [ class "title is-4" ] [ text "What am I planning on doing?" ]
         , ul [] todoTasks
         ]
 
@@ -99,6 +102,8 @@ viewTodoTask : String -> Html Msg
 viewTodoTask task =
     li [ class "task" ]
         [ text task
+        , button [ class "button is-small", onClick (WaitOnTask task) ]
+            [ viewIcon "fas fa-clock" ]
         , button [ class "button is-small", onClick (Complete task) ]
             [ viewIcon "fas fa-check" ]
         ]
@@ -116,7 +121,7 @@ viewCompletedTasks model =
                     List.map viewCompletedTask model.completed
     in
     div [ class "content" ]
-        [ h3 [ class "title is-4" ] [ text "Completed" ]
+        [ h3 [ class "title is-4" ] [ text "What have I completed?" ]
         , ul [] completedTasks
         ]
 
@@ -127,6 +132,32 @@ viewCompletedTask task =
         [ text task
         , button [ class "button is-small", onClick (Delete task) ]
             [ viewIcon "fas fa-trash-alt" ]
+        ]
+
+
+viewEventualTasks : Model -> Html Msg
+viewEventualTasks model =
+    let
+        eventualTasks =
+            case model.eventualTasks of
+                [] ->
+                    [ li [] [ text "Nothing to do in the future" ] ]
+
+                _ ->
+                    List.map viewEventualTask model.eventualTasks
+    in
+    div [ class "content" ]
+        [ h3 [ class "title is-4" ] [ text "What do I need to do in the near future?" ]
+        , ul [] eventualTasks
+        ]
+
+
+viewEventualTask : String -> Html Msg
+viewEventualTask task =
+    li [ class "task" ]
+        [ text task
+        , button [ class "button is-small", onClick (BumpTaskToTodo task) ]
+            [ viewIcon "fas fa-angle-double-up" ]
         ]
 
 
@@ -156,6 +187,8 @@ type Msg
     | Add
     | Complete String
     | Delete String
+    | WaitOnTask String
+    | BumpTaskToTodo String
     | FocusResult (Result Dom.Error ())
     | ClearError
 
@@ -174,6 +207,12 @@ update msg model =
 
         ChangeStandupTask newInput ->
             { model | currentStandupTask = newInput } ! []
+
+        WaitOnTask task ->
+            waitOnTask task model ! [ focusOnTaskInput ]
+
+        BumpTaskToTodo task ->
+            bumpTaskToTodo task model ! []
 
         FocusResult result ->
             case result of
@@ -217,6 +256,22 @@ completeTask completedTask model =
     { model
         | todo = removeTask completedTask model.todo
         , completed = completedTask :: model.completed
+    }
+
+
+waitOnTask : String -> Model -> Model
+waitOnTask task model =
+    { model
+        | todo = removeTask task model.todo
+        , eventualTasks = task :: model.eventualTasks
+    }
+
+
+bumpTaskToTodo : String -> Model -> Model
+bumpTaskToTodo task model =
+    { model
+        | todo = task :: model.todo
+        , eventualTasks = removeTask task model.eventualTasks
     }
 
 
