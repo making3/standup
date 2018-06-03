@@ -39,10 +39,10 @@ model =
 view : Model -> Html Msg
 view model =
     div []
-        [ input [ onInput ChangeStandupTask, value model.currentStandupTask ] []
-        , button [ onClick Add ] [ text "Add" ]
+        [ viewCompletedTasks model
         , viewTodoTasks model
-        , viewCompletedTasks model
+        , input [ onInput ChangeStandupTask, value model.currentStandupTask ] []
+        , button [ onClick Add ] [ text "Add" ]
         ]
 
 
