@@ -41,24 +41,17 @@ view model =
     div []
         [ input [ onInput ChangeStandupTask, value model.currentStandupTask ] []
         , button [ onClick Add ] [ text "Add" ]
-        , div []
-            [ h6 [] [ text "TODO" ]
-            , viewTodoTasks model.todo
-            ]
-        , div []
-            [ h6 [] [ text "Completed" ]
-            , viewCompletedTasks model.completed
-            ]
+        , viewTodoTasks model
+        , viewCompletedTasks model
         ]
 
 
-viewTodoTasks : List String -> Html Msg
-viewTodoTasks todoTasks =
-    let
-        todoTaskHtml =
-            List.map viewTodoTask todoTasks
-    in
-    div [] todoTaskHtml
+viewTodoTasks : Model -> Html Msg
+viewTodoTasks model =
+    div []
+        [ h6 [] [ text "TODO" ]
+        , div [] (List.map viewTodoTask model.todo)
+        ]
 
 
 viewTodoTask : String -> Html Msg
@@ -69,13 +62,12 @@ viewTodoTask task =
         ]
 
 
-viewCompletedTasks : List String -> Html Msg
-viewCompletedTasks completedTasks =
-    let
-        completedTaskHtml =
-            List.map viewCompletedTask completedTasks
-    in
-    div [] completedTaskHtml
+viewCompletedTasks : Model -> Html Msg
+viewCompletedTasks model =
+    div []
+        [ h6 [] [ text "Completed" ]
+        , div [] (List.map viewCompletedTask model.completed)
+        ]
 
 
 viewCompletedTask : String -> Html Msg
