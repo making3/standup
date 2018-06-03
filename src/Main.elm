@@ -184,7 +184,12 @@ taskInputId =
 
 addNewTask : String -> Model -> Model
 addNewTask newTask model =
-    { model | todo = model.currentStandupTask :: model.todo, currentStandupTask = "" }
+    case model.currentStandupTask of
+        "" ->
+            model ! []
+
+        _ ->
+            { model | todo = model.currentStandupTask :: model.todo, currentStandupTask = "" }
 
 
 completeTask : String -> Model -> Model
