@@ -1,7 +1,7 @@
 module Main exposing (..)
 
 import Dom exposing (focus)
-import Html exposing (Attribute, Html, button, div, h4, input, li, span, text, ul)
+import Html exposing (Attribute, Html, a, button, div, h3, i, input, li, span, text, ul)
 import Html.Attributes exposing (class, disabled, hidden, id, value)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Json.Decode
@@ -49,7 +49,7 @@ init =
 
 view : Model -> Html Msg
 view model =
-    div []
+    div [ class "box container" ]
         [ viewError model
         , viewCompletedTasks model
         , viewTodoTasks model
@@ -78,17 +78,18 @@ viewTodoTasks model =
                 _ ->
                     List.map viewTodoTask model.todo
     in
-    div []
-        [ h4 [] [ text "TODO" ]
+    div [ class "content" ]
+        [ h3 [ class "title is-4" ] [ text "TODO" ]
         , ul [] todoTasks
         ]
 
 
 viewTodoTask : String -> Html Msg
 viewTodoTask task =
-    li []
+    li [ class "task" ]
         [ text task
-        , button [ onClick (Complete task) ] [ text "Complete" ]
+        , button [ class "button is-small", onClick (Complete task) ]
+            [ viewIcon "fas fa-check" ]
         ]
 
 
@@ -103,18 +104,24 @@ viewCompletedTasks model =
                 _ ->
                     List.map viewCompletedTask model.completed
     in
-    div []
-        [ h4 [] [ text "Completed" ]
+    div [ class "content" ]
+        [ h3 [ class "title is-4" ] [ text "Completed" ]
         , ul [] completedTasks
         ]
 
 
 viewCompletedTask : String -> Html Msg
 viewCompletedTask task =
-    div []
+    li [ class "task" ]
         [ text task
-        , button [ onClick (Delete task) ] [ text "Remove" ]
+        , button [ class "button is-small", onClick (Delete task) ]
+            [ viewIcon "fas fa-trash-alt" ]
         ]
+
+
+viewIcon : String -> Html Msg
+viewIcon fontAwesomeIcon =
+    span [ class "icon" ] [ i [ class fontAwesomeIcon ] [] ]
 
 
 onEnter : Msg -> Attribute Msg

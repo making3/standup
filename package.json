@@ -13,5 +13,8 @@
   "devDependencies": {
     "chokidar-cli": "^1.2.0",
     "elm": "^0.18.0"
+  },
+  "dependencies": {
+    "bulma": "^0.7.1"
   }
 }
