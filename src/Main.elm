@@ -4,12 +4,17 @@ import Dom exposing (focus)
 import Html exposing (Attribute, Html, a, button, div, h3, i, input, li, span, text, ul)
 import Html.Attributes exposing (class, disabled, hidden, id, placeholder, value)
 import Html.Events exposing (keyCode, on, onClick, onInput)
-import Json.Decode
+import Http
+import Json.Decode as Json
+import Navigation
+import OAuth
+import OAuth.Implicit
 import Task
 
 
 main =
-    Html.program
+    Navigation.program
+        (always Nop)
         { init = init
         , view = view
         , update = update
@@ -27,22 +32,70 @@ type alias Model =
     , eventualTasks : List String
     , currentStandupTask : String
     , error : Maybe String
+    , token : Maybe OAuth.Token
+    , oauth :
+        { clientId : String
+        , redirectUri : String
+        }
     }
 
 
-initialModel : Model
-initialModel =
+initialModel : Navigation.Location -> Model
+initialModel location =
     { todo = []
     , completed = []
     , eventualTasks = []
     , currentStandupTask = ""
     , error = Nothing
+    , token = Nothing
+    , oauth =
+        { clientId = ""
+        , redirectUri = location.origin ++ location.pathname
+        }
     }
 
 
-init : ( Model, Cmd Msg )
-init =
-    initialModel ! [ focusOnTaskInput ]
+init : Navigation.Location -> ( Model, Cmd Msg )
+init location =
+    let
+        model =
+            initialModel location
+    in
+    case OAuth.Implicit.parse location of
+        Ok { token } ->
+            -- let
+            --     req =
+            --         Http.request
+            --             { method = "GET"
+            --             , body = Http.emptyBody
+            --             , headers = OAuth.use token []
+            --             , withCredentials = False
+            --             , url = profileEndpoint
+            --             , expect = Http.expectJson profileDecoder
+            --             , timeout = Nothing
+            -- --             }
+            -- -- in
+            { model | token = Just token }
+                ! [ Navigation.modifyUrl model.oauth.redirectUri
+
+                  -- , Http.send GetProfile req
+                  , focusOnTaskInput
+                  ]
+
+        Err OAuth.Empty ->
+            model ! []
+
+        Err (OAuth.OAuthErr err) ->
+            { model | error = Just <| OAuth.showErrCode err.error }
+                ! [ Navigation.modifyUrl model.oauth.redirectUri ]
+
+        Err _ ->
+            { model | error = Just "parsing error" } ! []
+
+
+authorizationEndpoint : String
+authorizationEndpoint =
+    "https://accounts.google.com/o/oauth2/v2/auth"
 
 
 
@@ -52,7 +105,8 @@ init =
 view : Model -> Html Msg
 view model =
     div [ class "box container" ]
-        [ viewError model
+        [ viewHeader model
+        , viewError model
         , viewCompletedTasks model
         , viewTodoTasks model
         , viewEventualTasks model
@@ -66,6 +120,23 @@ view model =
             ]
             []
         ]
+
+
+viewHeader : Model -> Html Msg
+viewHeader model =
+    case model.token of
+        Just tokenOAuth ->
+            case tokenOAuth of
+                OAuth.Bearer token ->
+                    div [] [ text token ]
+
+        Nothing ->
+            viewLoginButton
+
+
+viewLoginButton : Html Msg
+viewLoginButton =
+    button [ onClick Authorize ] [ text "Authorize" ]
 
 
 viewError : Model -> Html Msg
@@ -171,11 +242,11 @@ onEnter msg =
     let
         isEnter code =
             if code == 13 then
-                Json.Decode.succeed msg
+                Json.succeed msg
             else
-                Json.Decode.fail "not ENTER"
+                Json.fail "not ENTER"
     in
-    on "keydown" (Json.Decode.andThen isEnter keyCode)
+    on "keydown" (Json.andThen isEnter keyCode)
 
 
 
@@ -183,7 +254,8 @@ onEnter msg =
 
 
 type Msg
-    = ChangeStandupTask String
+    = Nop
+    | ChangeStandupTask String
     | Add
     | Complete String
     | Delete String
@@ -191,11 +263,15 @@ type Msg
     | BumpTaskToTodo String
     | FocusResult (Result Dom.Error ())
     | ClearError
+    | Authorize
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Nop ->
+            model ! []
+
         Add ->
             addNewTask model.currentStandupTask model ! []
 
@@ -224,6 +300,18 @@ update msg model =
 
         ClearError ->
             { model | error = Nothing } ! []
+
+        Authorize ->
+            model
+                ! [ OAuth.Implicit.authorize
+                        { clientId = model.oauth.clientId
+                        , redirectUri = model.oauth.redirectUri
+                        , responseType = OAuth.Token
+                        , scope = [ "email", "profile" ]
+                        , state = Nothing
+                        , url = authorizationEndpoint
+                        }
+                  ]
 
 
 focusOnTaskInput : Cmd Msg
