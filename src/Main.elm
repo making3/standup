@@ -1,11 +1,13 @@
 module Main exposing (..)
 
 import Dom exposing (focus)
-import Html exposing (Attribute, Html, a, button, div, h3, i, input, li, span, text, ul)
+import Html exposing (Attribute, Html, a, button, div, h1, h3, i, input, li, span, text, ul)
 import Html.Attributes exposing (class, disabled, hidden, id, placeholder, value)
 import Html.Events exposing (keyCode, on, onClick, onInput)
 import Http
-import Json.Decode as Json
+import Json.Decode exposing (Decoder, andThen, fail, int, list, string, succeed)
+import Json.Decode.Pipeline exposing (decode, required)
+import Json.Encode
 import Navigation
 import OAuth
 import OAuth.Implicit
@@ -37,6 +39,7 @@ type alias Model =
         { clientId : String
         , redirectUri : String
         }
+    , id : String -- TODO: Make this a maybe
     }
 
 
@@ -52,6 +55,26 @@ initialModel location =
         { clientId = ""
         , redirectUri = location.origin ++ location.pathname
         }
+    , id = ""
+    }
+
+
+type alias DriveFileIdentifier =
+    { id : String }
+
+
+
+--     {
+--  "kind": "drive#file",
+--  "id": "1NZLCpnaaKCMIb0OrKElEOcuuCKbG4zUggy2PNgJnYys",
+--  "name": "CSCareerQuestions Salary Sharing Survey (Responses)",
+--  "mimeType": "application/vnd.google-apps.spreadsheet"
+-- },
+-- TODO: Rename, this is horrible lol
+
+
+type alias DriveSearch =
+    { files : List DriveFileIdentifier
     }
 
 
@@ -63,22 +86,21 @@ init location =
     in
     case OAuth.Implicit.parse location of
         Ok { token } ->
-            -- let
-            --     req =
-            --         Http.request
-            --             { method = "GET"
-            --             , body = Http.emptyBody
-            --             , headers = OAuth.use token []
-            --             , withCredentials = False
-            --             , url = profileEndpoint
-            --             , expect = Http.expectJson profileDecoder
-            --             , timeout = Nothing
-            -- --             }
-            -- -- in
+            let
+                req =
+                    Http.request
+                        { method = "GET"
+                        , body = Http.emptyBody
+                        , headers = OAuth.use token []
+                        , withCredentials = False
+                        , url = filesEndpoint ++ "?spaces=appDataFolder&name = 'standup.json'"
+                        , expect = Http.expectJson driveSearchDecoder
+                        , timeout = Nothing
+                        }
+            in
             { model | token = Just token }
                 ! [ Navigation.modifyUrl model.oauth.redirectUri
-
-                  -- , Http.send GetProfile req
+                  , Http.send GetDriveSearch req
                   , focusOnTaskInput
                   ]
 
@@ -98,6 +120,11 @@ authorizationEndpoint =
     "https://accounts.google.com/o/oauth2/v2/auth"
 
 
+filesEndpoint : String
+filesEndpoint =
+    "https://www.googleapis.com/drive/v3/files"
+
+
 
 -- VIEW
 
@@ -106,6 +133,7 @@ view : Model -> Html Msg
 view model =
     div [ class "box container" ]
         [ viewHeader model
+        , h1 [] [ text ("ID" ++ model.id) ]
         , viewError model
         , viewCompletedTasks model
         , viewTodoTasks model
@@ -242,11 +270,11 @@ onEnter msg =
     let
         isEnter code =
             if code == 13 then
-                Json.succeed msg
+                succeed msg
             else
-                Json.fail "not ENTER"
+                fail "not ENTER"
     in
-    on "keydown" (Json.andThen isEnter keyCode)
+    on "keydown" (andThen isEnter keyCode)
 
 
 
@@ -264,6 +292,8 @@ type Msg
     | FocusResult (Result Dom.Error ())
     | ClearError
     | Authorize
+    | GetDriveSearch (Result Http.Error DriveSearch)
+    | StandupDataCreated (Result Http.Error DriveFileIdentifier)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -307,11 +337,69 @@ update msg model =
                         { clientId = model.oauth.clientId
                         , redirectUri = model.oauth.redirectUri
                         , responseType = OAuth.Token
-                        , scope = [ "email", "profile" ]
+                        , scope =
+                            [ "https://www.googleapis.com/auth/drive.appdata"
+                            , "https://www.googleapis.com/auth/drive.readonly"
+                            , "https://www.googleapis.com/auth/drive.metadata.readonly"
+                            , "https://www.googleapis.com/auth/drive.file"
+                            , "https://www.googleapis.com/auth/drive"
+                            ]
                         , state = Nothing
                         , url = authorizationEndpoint
                         }
                   ]
+
+        GetDriveSearch result ->
+            case result of
+                Err err ->
+                    handleHttpError model err ! []
+
+                Ok driveSearch ->
+                    let
+                        first =
+                            List.head driveSearch.files
+
+                        -- |> Maybe.withDefault
+                        --     { id = "asdfasdfa"
+                        --     }
+                    in
+                    case first of
+                        Just actualFirst ->
+                            { model | id = actualFirst.id } ! []
+
+                        Nothing ->
+                            let
+                                _ =
+                                    Debug.log "wtf" driveSearch.files
+                            in
+                            createStandupData model
+
+        StandupDataCreated result ->
+            case result of
+                Err err ->
+                    handleHttpError model err ! []
+
+                Ok driveFile ->
+                    { model | id = driveFile.id } ! []
+
+
+handleHttpError : Model -> Http.Error -> Model
+handleHttpError model errorHttp =
+    case errorHttp of
+        Http.Timeout ->
+            { model | error = Just "Timeout" }
+
+        Http.NetworkError ->
+            { model | error = Just "NetworkError " }
+
+        Http.BadPayload wat a ->
+            { model | error = Just ("unexpected" ++ wat) }
+
+        Http.BadStatus str ->
+            { model | error = Just ("bad: " ++ str.body) }
+
+        Http.BadUrl a ->
+            { model | error = Just ("bad url: " ++ a) }
 
 
 focusOnTaskInput : Cmd Msg
@@ -368,6 +456,28 @@ removeTask taskToRemove tasks =
     List.filter (\task -> task /= taskToRemove) tasks
 
 
+createStandupData : Model -> ( Model, Cmd Msg )
+createStandupData model =
+    case model.token of
+        Just token ->
+            let
+                req =
+                    Http.request
+                        { method = "POST"
+                        , body = { name = "standup.json", parents = [] } |> newFileEncoder |> Http.jsonBody
+                        , headers = OAuth.use token []
+                        , withCredentials = False
+                        , url = filesEndpoint
+                        , expect = Http.expectJson driveFileIdentifierDecoder
+                        , timeout = Nothing
+                        }
+            in
+            model ! [ Http.send StandupDataCreated req ]
+
+        Nothing ->
+            model ! []
+
+
 
 -- SUBSCRIPTIONS
 
@@ -375,3 +485,37 @@ removeTask taskToRemove tasks =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.none
+
+
+
+-- SERIALIZATION
+
+
+type alias NewFile =
+    { name : String
+    , parents : List String
+    }
+
+
+newFileEncoder newFile =
+    Json.Encode.object
+        [ ( "name", Json.Encode.string newFile.name )
+        , ( "parents", Json.Encode.list (List.map Json.Encode.string newFile.parents) )
+        ]
+
+
+driveFileEncoder fileIdentifier =
+    Json.Encode.object
+        [ ( "id", Json.Encode.string fileIdentifier.id ) ]
+
+
+driveFileIdentifierDecoder : Decoder DriveFileIdentifier
+driveFileIdentifierDecoder =
+    decode DriveFileIdentifier
+        |> required "id" string
+
+
+driveSearchDecoder : Decoder DriveSearch
+driveSearchDecoder =
+    decode DriveSearch
+        |> required "files" (list driveFileIdentifierDecoder)
